@@ -1,0 +1,4 @@
+const redis = new Redis({
+  url: "https://strong-egret-33354.upstash.io",
+  token: "AYJKAAIjcDE1MjM1ZTdiMmIwZTQ0NDg3YTcyYTQ5YTZjY2VlNzY2NHAxMA",
+});
