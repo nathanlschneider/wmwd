@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { bannedIPService } from "./BannedIPService"
 import { logger } from "@erroraware/client";
 

@@ -1,16 +1,25 @@
 type ClientSettings = {
   rateLimit: {
-    requests: number;
-    duration: string; // e.g. "10s"
+    requestsPerDuration: number;
+    banThreshold: number;
+    softBanDuration: number;
+    softBanViolations: number;
+    allowEmptyUserAgents: boolean;
+    enableHoneypot: boolean;
+    checkRefererHeader: boolean;
+    checkOriginHeader: boolean;
+    checkAcceptHeader: boolean;
+    limitExceededWarn: boolean;
+    limitExceededBan: boolean;
+    securityPolicy: 'none' | 'strict' | 'moderate';
+    blockedCountryCodes: null | string[];
+    lastSyncedAt: string;
   };
-  blockBlankUserAgents: boolean;
-  suspiciousPatterns: string[];
-  customRules?: Record<string, any>;
 };
 
 class ClientSettingsService {
   private static instance: ClientSettingsService;
-  private settings: ClientSettings | null = null;
+  private settings: ClientSettings['rateLimit'] | null = null;
   private lastFetch: Date | null = null;
   private cacheDuration = 5 * 60 * 1000; // 5 minutes
 
@@ -25,52 +34,75 @@ class ClientSettingsService {
 
   public async fetchSettings(): Promise<void> {
     if (!process.env.ERROR_AWARE_KEY) {
-      throw new Error("ERROR_AWARE_KEY not set");
+      throw new Error('ERROR_AWARE_KEY not set');
     }
 
-    const decoded = Buffer.from(process.env.ERROR_AWARE_KEY, "base64").toString(
-      "utf-8"
+    const decoded = Buffer.from(process.env.ERROR_AWARE_KEY, 'base64').toString(
+      'utf-8'
     );
-    const [clientId] = decoded.split(":");
+    const [clientId] = decoded.split(':');
 
-    const res = await fetch(`https://erroraware.com/api/entities?where[validationId][equals]=${clientId}`, {
-      method: "GET",
+    const res = await fetch(`https://erroraware.com/api/clientconfigs`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "ErrorAwareClient/2.18.0",
+        'Content-Type': 'application/json',
+        'User-Agent': 'ErrorAwareClient/2.18.0',
       },
-      });
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch settings: ${res.status}`);
-    }
-
-    const data = await res.json();
-
-    this.settings = {
-      rateLimit: {
-        requests: data.rateLimit?.requests ?? 5,
-        duration: data.rateLimit?.duration ?? "10s",
-      },
-      blockBlankUserAgents: !!data.blockBlankUserAgents,
-      suspiciousPatterns: data.suspiciousPatterns ?? [],
-      customRules: data.customRules ?? {},
-    };
+      body: JSON.stringify({
+        validationId: clientId,
+      }),
+    });
 
     this.lastFetch = new Date();
-  }
 
+    if (!res.ok) {
+      const cloned = res.clone();
+      const json = await cloned.json();
+      this.settings = json.error;
+    } else {
+      const data: ClientSettings['rateLimit'] = await res.json();
+
+      this.settings = {
+        requestsPerDuration: data.requestsPerDuration,
+        banThreshold: data.banThreshold,
+        softBanDuration: data.softBanDuration,
+        softBanViolations: data.softBanViolations,
+        allowEmptyUserAgents: data.allowEmptyUserAgents,
+        enableHoneypot: data.enableHoneypot,
+        checkRefererHeader: data.checkRefererHeader,
+        checkOriginHeader: data.checkOriginHeader,
+        checkAcceptHeader: data.checkAcceptHeader,
+        limitExceededWarn: data.limitExceededWarn,
+        limitExceededBan: data.limitExceededBan,
+        securityPolicy: data.securityPolicy,
+        blockedCountryCodes: data.blockedCountryCodes,
+        lastSyncedAt: data.lastSyncedAt,
+      };
+    }
+  }
   public async shouldRefetch(): Promise<boolean> {
     if (!this.lastFetch) return true;
     return Date.now() - this.lastFetch.getTime() > this.cacheDuration;
   }
 
   public getSettings(): ClientSettings | null {
-    return this.settings;
+    return this.settings ? { rateLimit: this.settings } : null;
   }
 
   public async forceRefresh(): Promise<void> {
     await this.fetchSettings();
+  }
+
+  public async getInitializedSettings(): Promise<ClientSettings> {
+    if (!this.settings || (await this.shouldRefetch())) {
+      await this.fetchSettings();
+    }
+
+    if (!this.settings) {
+    throw new Error('Settings not initialized');
+    }
+
+    return { rateLimit: this.settings };
   }
 }
 

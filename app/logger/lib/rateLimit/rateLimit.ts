@@ -7,8 +7,8 @@ const redis = new Redis({
 });
 
 
-const duration: Duration = "10s";
-const numberOfRequestsPerDuration = 5;
+const duration: Duration = "1m";
+const numberOfRequestsPerDuration = 500;
 
 const ratelimit = new Ratelimit({
   redis,

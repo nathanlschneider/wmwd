@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import { LogReceiver, logger } from "@erroraware/client";
+import { LogReceiver} from "@erroraware/client";
 import * as fs from "fs";
 import { NextRequest, NextResponse } from "next/server";
 import { privateKey } from "./lib/keyImports";
@@ -11,7 +11,6 @@ import {
   objectProperyRemover,
   securityHeaders,
 } from "./lib/shared";
-import { rateLimit } from "./lib/rateLimit/rateLimit";
 import type { ResJsonType } from "./lib/types";
 import * as zlib from "zlib";
 

@@ -3,6 +3,7 @@ class BannedIPService {
   private bannedIPs: Set<string> = new Set();
   private lastFetch: Date | null = null;
   private cacheDuration = 5 * 60 * 1000; // 5 minutes
+  private pendingFetch: Promise<void> | null = null;
 
   private constructor() {}
 
@@ -14,58 +15,68 @@ class BannedIPService {
   }
 
   public async fetchBannedIPs(): Promise<void> {
-    if (!process.env.ERROR_AWARE_KEY) {
-      throw new Error("ERROR_AWARE_KEY environment variable is not configured");
+    if (this.pendingFetch) return this.pendingFetch;
+
+    const errorAwareKey = process.env.ERROR_AWARE_KEY;
+    if (!errorAwareKey) {
+      throw new Error('ERROR_AWARE_KEY environment variable is not configured');
     }
 
-    try {
-      const decodedData = Buffer.from(
-        process.env.ERROR_AWARE_KEY,
-        "base64"
-      ).toString("utf-8");
+    this.pendingFetch = (async () => {
+      try {
+        const decodedData = Buffer.from(errorAwareKey, 'base64').toString(
+          'utf-8'
+        );
 
-      const [vId] = decodedData.split(":");
-      if (!vId) {
-        throw new Error("Invalid ERROR_AWARE_KEY format");
-      }
-
-      const response = await this.fetchWithRetry(
-        "https://erroraware.com/api/blockedips",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "User-Agent": "ErrorAwareClient/2.18.0",
-          },
-          body: JSON.stringify({
-            validationId: "0cfc6ed9-df63-437d-909b-68769ca8278f",
-          }),
+        const [vId] = decodedData.split(':');
+        if (!vId) {
+          throw new Error('Invalid ERROR_AWARE_KEY format');
         }
-      );
+        const protocol =
+          process.env.NODE_ENV === 'production' ? 'https' : 'http';
+        const host =
+          process.env.NODE_ENV === 'production'
+            ? 'erroraware.com'
+            : 'localhost:3002';
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        const response = await this.fetchWithRetry(
+          `${protocol}://${host}/api/blockedips`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'ErrorAwareClient/2.18.0',
+            },
+            body: JSON.stringify({ validationId: vId }),
+          }
+        );
 
-      const data = await response.json();
-      console.log("data", data);
-      if (!Array.isArray(data.blockedIps)) {
-        throw new Error("Invalid API response format");
-      }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      this.bannedIPs.clear();
-      data.blockedIps.forEach((obj: { id: string; ip: string }) => {
-        if (this.isValidIP(obj.ip)) {
+        const data = await response.json();
+
+        if (!Array.isArray(data.blockedIps)) {
+          throw new Error('Invalid API response format');
+        }
+
+        this.bannedIPs.clear();
+        data.blockedIps.forEach((obj: { id: string; ip: string }) => {
+          console.log(`Banned IP: ${obj.ip}`);
           this.bannedIPs.add(obj.ip);
-        }
-      });
+        });
 
-      this.lastFetch = new Date();
-      console.log("fetch seemed to work");
-    } catch (error) {
-      console.error("Failed to fetch banned IPs:", error);
-      throw error; // Re-throw to allow caller to handle
-    }
+        this.lastFetch = new Date();
+      } catch (error) {
+        console.error('Failed to fetch banned IPs:', error);
+        throw error;
+      } finally {
+        this.pendingFetch = null;
+      }
+    })();
+
+    return this.pendingFetch;
   }
 
   private async fetchWithRetry(
@@ -79,9 +90,9 @@ class BannedIPService {
         if (response.ok) return response;
 
         if (response.status === 429) {
-          const retryAfter = response.headers.get("Retry-After");
+          const retryAfter = response.headers.get('Retry-After');
           await new Promise((resolve) =>
-            setTimeout(resolve, parseInt(retryAfter ?? "5") * 1000)
+            setTimeout(resolve, parseInt(retryAfter ?? '5') * 1000)
           );
           continue;
         }
@@ -94,7 +105,7 @@ class BannedIPService {
         );
       }
     }
-    throw new Error("Max retries exceeded");
+    throw new Error('Max retries exceeded');
   }
 
   async shouldRefetch(): Promise<boolean> {
@@ -110,20 +121,8 @@ class BannedIPService {
     await this.fetchBannedIPs();
   }
 
-  private isValidIP(ip: string): boolean {
-    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-
-    if (!ipv4Regex.test(ip) && !ipv6Regex.test(ip)) {
-      return false;
-    }
-
-    if (ipv4Regex.test(ip)) {
-      const parts = ip.split(".").map((part) => parseInt(part, 10));
-      return parts.every((part) => part >= 0 && part <= 255);
-    }
-
-    return true;
+  public getBannedIPs(): string[] {
+    return Array.from(this.bannedIPs);
   }
 }
 
