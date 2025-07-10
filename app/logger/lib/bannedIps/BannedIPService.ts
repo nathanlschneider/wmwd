@@ -1,3 +1,7 @@
+/**
+ * Singleton service for managing and caching a list of banned IP addresses fetched from the ErrorAware API.
+ */
+
 class BannedIPService {
   private static instance: BannedIPService;
   private bannedIPs: Set<string> = new Set();
@@ -16,6 +20,13 @@ class BannedIPService {
 
   public async fetchBannedIPs(): Promise<void> {
     if (this.pendingFetch) return this.pendingFetch;
+
+    const shouldRefetch = await this.shouldRefetch();
+    if (!shouldRefetch) return;
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('refreshing');
+    }
 
     const errorAwareKey = process.env.ERROR_AWARE_KEY;
     if (!errorAwareKey) {
@@ -40,14 +51,13 @@ class BannedIPService {
             : 'localhost:3002';
 
         const response = await this.fetchWithRetry(
-          `${protocol}://${host}/api/blockedips`,
+          `${protocol}://${host}/api/blockedips?vid=${vId}`,
           {
-            method: 'POST',
+            method: 'GET',
             headers: {
               'Content-Type': 'application/json',
               'User-Agent': 'ErrorAwareClient/2.18.0',
             },
-            body: JSON.stringify({ validationId: vId }),
           }
         );
 
@@ -63,8 +73,10 @@ class BannedIPService {
 
         this.bannedIPs.clear();
         data.blockedIps.forEach((obj: { id: string; ip: string }) => {
-          console.log(`Banned IP: ${obj.ip}`);
-          this.bannedIPs.add(obj.ip);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Banned IP: ${obj.ip}`);
+          }
+          this.bannedIPs.add(obj.ip.trim());
         });
 
         this.lastFetch = new Date();
@@ -114,7 +126,7 @@ class BannedIPService {
   }
 
   isIPBanned(ip: string): boolean {
-    return this.bannedIPs.has(ip);
+    return this.bannedIPs.has(ip.trim());
   }
 
   async forceRefresh(): Promise<void> {

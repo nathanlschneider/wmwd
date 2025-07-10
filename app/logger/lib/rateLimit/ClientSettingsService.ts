@@ -32,6 +32,29 @@ class ClientSettingsService {
     return ClientSettingsService.instance;
   }
 
+  public async blockThisIP(ip: string): Promise<void> {
+    const host =
+      process.env.NODE_ENV === 'production'
+        ? 'erroraware.com'
+        : 'localhost:3002';
+    const protocol =
+      process.env.NODE_ENV === 'development' && host.includes('localhost')
+        ? 'http'
+        : 'https';
+
+    await fetch(`${protocol}://${host}/api/blockedips`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'ErrorAwareClient/2.18.0',
+      },
+      body: JSON.stringify({
+        validationId: process.env.ERROR_AWARE_KEY || '',
+        ip,
+      }),
+    });
+  }
+
   public async fetchSettings(): Promise<void> {
     if (!process.env.ERROR_AWARE_KEY) {
       throw new Error('ERROR_AWARE_KEY not set');
@@ -41,8 +64,16 @@ class ClientSettingsService {
       'utf-8'
     );
     const [clientId] = decoded.split(':');
+    const host =
+      process.env.NODE_ENV === 'production'
+        ? 'erroraware.com'
+        : 'localhost:3002';
+    const protocol =
+      process.env.NODE_ENV === 'development' && host.includes('localhost')
+        ? 'http'
+        : 'https';
 
-    const res = await fetch(`https://erroraware.com/api/clientconfigs`, {
+    const res = await fetch(`${protocol}://${host}/api/clientconfigs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +91,13 @@ class ClientSettingsService {
       const json = await cloned.json();
       this.settings = json.error;
     } else {
-      const data: ClientSettings['rateLimit'] = await res.json();
+      const json = await res.json();
+
+      if (!json?.entity?.rateLimit) {
+        throw new Error('Invalid response from /clientconfigs');
+      }
+
+      const data: ClientSettings['rateLimit'] = json.entity.rateLimit;
 
       this.settings = {
         requestsPerDuration: data.requestsPerDuration,
@@ -80,6 +117,7 @@ class ClientSettingsService {
       };
     }
   }
+
   public async shouldRefetch(): Promise<boolean> {
     if (!this.lastFetch) return true;
     return Date.now() - this.lastFetch.getTime() > this.cacheDuration;
@@ -99,7 +137,7 @@ class ClientSettingsService {
     }
 
     if (!this.settings) {
-    throw new Error('Settings not initialized');
+      throw new Error('Settings not initialized');
     }
 
     return { rateLimit: this.settings };

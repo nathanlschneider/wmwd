@@ -6,7 +6,6 @@ const redis = new Redis({
   token: "AYJKAAIjcDE1MjM1ZTdiMmIwZTQ0NDg3YTcyYTQ5YTZjY2VlNzY2NHAxMA",
 });
 
-
 const duration: Duration = "1m";
 const numberOfRequestsPerDuration = 500;
 
@@ -23,4 +22,18 @@ export async function rateLimit(
   const namespacedKey = `${clientId}:${ip}`;
   const { success } = await ratelimit.limit(namespacedKey);
   return success;
+}
+
+// NEW: Get current request count in the sliding window
+export async function getRequestCount(
+  clientId: string,
+  ip: string
+): Promise<number> {
+  const key = `ratelimit:${clientId}:${ip}`;
+  const now = Date.now();
+  const oneMinuteAgo = now - 60_000; // 1 minute in ms (match your duration)
+
+  // Count the number of requests in the last minute window
+  const count = await redis.zcount(key, oneMinuteAgo, now);
+  return count;
 }

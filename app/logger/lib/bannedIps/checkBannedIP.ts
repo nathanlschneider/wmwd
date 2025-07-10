@@ -1,38 +1,45 @@
 import { type NextRequest } from "next/server";
-import { bannedIPService } from "./BannedIPService"
+import { bannedIPService } from "./BannedIPService";
 import { logger } from "@erroraware/client";
 
-export function getClientIP(req: NextRequest): string {
-  // Try multiple header variations
-  const ipAddress =
-    // Standard proxy header
+/**
+ * Retrieves the client's IP address from a Next.js request object by checking various common headers.
+ *
+ * @param req - The Next.js request object.
+ * @returns The detected client IP address or null if none found.
+ */
+export function getClientIP(req: NextRequest): string | null {
+  return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    // Cloudflare
     req.headers.get("cf-connecting-ip") ||
-    // Fastly
     req.headers.get("fastly-client-ip") ||
-    // Akamai
     req.headers.get("true-client-ip") ||
-    // AWS Load Balancer
     req.headers.get("x-real-ip") ||
-    // Remote address from Next.js
-
-    // Default fallback
-    "0.0.0.0";
-
-  return ipAddress;
+    null
+  );
 }
 
+/**
+ * Checks if the client's IP address is banned.
+ *
+ * @param req - The Next.js request object.
+ * @returns `true` if IP is banned, otherwise `false`.
+ */
 export async function checkBannedIP(req: NextRequest): Promise<boolean> {
   const ip = getClientIP(req);
 
+  if (!ip) {
+    // No IP found, allow or block accordingly
+    return false;
+  }
+
   try {
     if (await bannedIPService.shouldRefetch()) {
-     bannedIPService.fetchBannedIPs();
+      await bannedIPService.fetchBannedIPs();
     }
   } catch (error) {
     logger.error("Failed to fetch banned IPs", error);
-    // Don't fail the request — just continue without updated list
+    // Don't fail the request — continue without updated list
   }
 
   const isBanned = bannedIPService.isIPBanned(ip);
