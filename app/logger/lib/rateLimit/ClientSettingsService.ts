@@ -1,25 +1,23 @@
 type ClientSettings = {
-  rateLimit: {
-    requestsPerDuration: number;
-    banThreshold: number;
-    softBanDuration: number;
-    softBanViolations: number;
-    allowEmptyUserAgents: boolean;
-    enableHoneypot: boolean;
-    checkRefererHeader: boolean;
-    checkOriginHeader: boolean;
-    checkAcceptHeader: boolean;
-    limitExceededWarn: boolean;
-    limitExceededBan: boolean;
-    securityPolicy: 'none' | 'strict' | 'moderate';
-    blockedCountryCodes: null | string[];
-    lastSyncedAt: string;
-  };
+  requestsPerDuration: number;
+  banThreshold: number;
+  softBanDuration: number;
+  softBanViolations: number;
+  allowEmptyUserAgents: boolean;
+  enableHoneypot: boolean;
+  checkRefererHeader: boolean;
+  checkOriginHeader: boolean;
+  checkAcceptHeader: boolean;
+  limitExceededWarn: boolean;
+  limitExceededBan: boolean;
+  securityPolicy: 'none' | 'strict' | 'moderate';
+  blockedCountryCodes: null | string[];
+  lastSyncedAt: string;
 };
 
 class ClientSettingsService {
   private static instance: ClientSettingsService;
-  private settings: ClientSettings['rateLimit'] | null = null;
+  private settings: ClientSettings | null = null;
   private lastFetch: Date | null = null;
   private cacheDuration = 5 * 60 * 1000; // 5 minutes
 
@@ -92,12 +90,11 @@ class ClientSettingsService {
       this.settings = json.error;
     } else {
       const json = await res.json();
-
-      if (!json?.entity?.rateLimit) {
+      if (!json?.entity) {
         throw new Error('Invalid response from /clientconfigs');
       }
 
-      const data: ClientSettings['rateLimit'] = json.entity.rateLimit;
+      const data: ClientSettings = json.entity;
 
       this.settings = {
         requestsPerDuration: data.requestsPerDuration,
@@ -115,6 +112,10 @@ class ClientSettingsService {
         blockedCountryCodes: data.blockedCountryCodes,
         lastSyncedAt: data.lastSyncedAt,
       };
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(this.settings);
+      }
     }
   }
 
@@ -124,10 +125,11 @@ class ClientSettingsService {
   }
 
   public getSettings(): ClientSettings | null {
-    return this.settings ? { rateLimit: this.settings } : null;
+    return this.settings ? this.settings : null;
   }
 
   public async forceRefresh(): Promise<void> {
+    console.log('Forcing refresh of client settings');
     await this.fetchSettings();
   }
 
@@ -140,7 +142,7 @@ class ClientSettingsService {
       throw new Error('Settings not initialized');
     }
 
-    return { rateLimit: this.settings };
+    return this.settings as ClientSettings;
   }
 }
 

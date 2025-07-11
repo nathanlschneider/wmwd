@@ -221,3 +221,10 @@
 {"type":"error","time":"2025-07-10T08:01:22.587Z","msg":"Failed to fetch banned IPs Invalid API response format"}
 {"type":"error","time":"2025-07-10T08:01:22.587Z","msg":"Failed to fetch banned IPs Invalid API response format"}
 {"type":"error","time":"2025-07-10T08:01:22.587Z","msg":"Failed to fetch banned IPs Invalid API response format"}
+{"type":"error","time":"2025-07-10T13:55:56.258Z","msg":"Failed to fetch banned IPs fetch failed"}
+{"type":"error","time":"2025-07-10T13:56:01.968Z","msg":"Failed to fetch banned IPs fetch failed"}
+{"type":"error","time":"2025-07-10T13:56:01.968Z","msg":"Failed to fetch banned IPs fetch failed"}
+{"type":"error","time":"2025-07-10T13:56:01.968Z","msg":"Failed to fetch banned IPs fetch failed"}
+{"type":"error","time":"2025-07-10T13:56:01.968Z","msg":"Failed to fetch banned IPs fetch failed"}
+{"type":"error","time":"2025-07-10T13:56:01.968Z","msg":"Failed to fetch banned IPs fetch failed"}
+{"type":"error","time":"2025-07-10T13:56:01.968Z","msg":"Failed to fetch banned IPs fetch failed"}

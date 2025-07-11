@@ -24,10 +24,6 @@ class BannedIPService {
     const shouldRefetch = await this.shouldRefetch();
     if (!shouldRefetch) return;
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('refreshing');
-    }
-
     const errorAwareKey = process.env.ERROR_AWARE_KEY;
     if (!errorAwareKey) {
       throw new Error('ERROR_AWARE_KEY environment variable is not configured');
@@ -130,6 +126,7 @@ class BannedIPService {
   }
 
   async forceRefresh(): Promise<void> {
+    console.log('Forcing refresh of banned IPs');
     await this.fetchBannedIPs();
   }
 

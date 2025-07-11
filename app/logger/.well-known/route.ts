@@ -6,59 +6,23 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { getClientId } from '../lib/rateLimit/getClientId';
 
-import type {
-  OwnershipPayload,
-  RequestPayload,
-  VerificationPayload,
-} from '../lib/types';
 import {
-  convertToEntity,
   createErrorResponse,
   createRequestContext,
+  convertToEntity,
   ErrorType,
   MAX_BODY_SIZE,
   securityHeaders,
 } from '../lib/shared';
-function isVerificationPayload(
-  payload: unknown
-): payload is VerificationPayload {
-  return (
-    typeof payload === 'object' &&
-    payload !== null &&
-    (payload as VerificationPayload).verificationType === 'connection' &&
-    typeof (payload as VerificationPayload).timestamp === 'number'
-  );
-}
 
-function isOwnershipPayload(payload: unknown): payload is OwnershipPayload {
-  return (
-    typeof payload === 'object' &&
-    payload !== null &&
-    (payload as OwnershipPayload).verificationType === 'ownership' &&
-    typeof (payload as OwnershipPayload).validationId === 'string'
-  );
-}
+import {
+  isVerificationPayload,
+  isOwnershipPayload,
+  verifyConnectionRequest,
+  verifyPayload,
+} from '../lib/validation';
 
-function verifyConnectionRequest(payload: Record<string, unknown>): boolean {
-  if (!isVerificationPayload(payload)) {
-    return false;
-  }
-
-  const timestampAge = Date.now() - payload.timestamp;
-  const ALLOWED_CLOCK_SKEW = 30000; // 30 seconds
-  return timestampAge <= 300000 + ALLOWED_CLOCK_SKEW; // 5 minutes + skew
-}
-
-function verifyPayload(payload: Record<string, unknown>): boolean {
-  const MAX_STRING_LENGTH = 1000;
-
-  return Object.entries(payload).every(([value]) => {
-    if (typeof value === 'string') {
-      return value.length <= MAX_STRING_LENGTH;
-    }
-    return true;
-  });
-}
+import { checkContentLength, checkHTTPS } from '../lib/shared';
 
 export async function POST(req: NextRequest) {
   const context = createRequestContext(req);
@@ -66,28 +30,21 @@ export async function POST(req: NextRequest) {
   const clientId = getClientId();
   if (clientId) {
     const allowed = await rateLimit(clientId, context.ip);
-
     if (!allowed) {
       logger.warn(`Rate limit exceeded (${context.ip})`);
       return createErrorResponse('Rate Limit Exceeded', 429);
     }
   }
 
-  if (
-    req.headers.get('content-length') &&
-    parseInt(req.headers.get('content-length')!) > MAX_BODY_SIZE
-  ) {
+  if (!checkContentLength(req, MAX_BODY_SIZE)) {
     return createErrorResponse('Request too large', 413);
   }
 
-  if (
-    req.headers.get('x-forwarded-proto') !== 'https' &&
-    process.env.NODE_ENV === 'production'
-  ) {
+  if (process.env.NODE_ENV === 'production' && !checkHTTPS(req)) {
     return createErrorResponse('HTTPS required');
   }
 
-  let requestData: RequestPayload;
+  let requestData;
   try {
     requestData = await req.json();
   } catch {
@@ -95,13 +52,8 @@ export async function POST(req: NextRequest) {
   }
 
   const { payload } = requestData;
-  if (!payload) {
-    return createErrorResponse('Missing payload', 400);
-  }
-
-  if (!verifyPayload(payload)) {
-    return createErrorResponse('Invalid payload format', 400);
-  }
+  if (!payload) return createErrorResponse('Missing payload', 400);
+  if (!verifyPayload(payload)) return createErrorResponse('Invalid payload format', 400);
 
   if (payload.verificationType === 'connection') {
     if (!isVerificationPayload(payload)) {
@@ -137,22 +89,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!process.env.ERROR_AWARE_KEY) {
-      return NextResponse.json({
-        success: false,
-        error: 'ERROR_AWARE_KEY not configured',
-        status: 500,
-      });
+      return createErrorResponse('ERROR_AWARE_KEY not configured', 500);
     }
 
     const entity = convertToEntity(process.env.ERROR_AWARE_KEY);
-
     if (payload.validationId !== entity.validationId) {
-      return NextResponse.json({
-        success: false,
-        error: 'ERROR_AWARE_KEY does not match',
-        status: 400,
-      });
+      return createErrorResponse('ERROR_AWARE_KEY does not match', 400);
     }
+
     return NextResponse.json(
       {
         success: true,
@@ -201,10 +145,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ version: pkg.version });
     } catch (err) {
       console.log(err);
-      return NextResponse.json(
-        { error: 'Failed to read client version' },
-        { status: 500 }
-      );
+      return createErrorResponse('Failed to read client version', 500);
     }
   }
 

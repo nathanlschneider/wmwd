@@ -1,13 +1,14 @@
-import { Ratelimit, type Duration } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { Ratelimit, type Duration } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+import { clientSettingsService } from './ClientSettingsService';
 
 const redis = new Redis({
-  url: "https://strong-egret-33354.upstash.io",
-  token: "AYJKAAIjcDE1MjM1ZTdiMmIwZTQ0NDg3YTcyYTQ5YTZjY2VlNzY2NHAxMA",
+  url: 'https://strong-egret-33354.upstash.io',
+  token: 'AYJKAAIjcDE1MjM1ZTdiMmIwZTQ0NDg3YTcyYTQ5YTZjY2VlNzY2NHAxMA',
 });
-
-const duration: Duration = "1m";
-const numberOfRequestsPerDuration = 500;
+const settings = clientSettingsService.getSettings();
+const duration: Duration = '1s'; // 1 second
+const numberOfRequestsPerDuration = settings?.requestsPerDuration || 10;
 
 const ratelimit = new Ratelimit({
   redis,
@@ -24,16 +25,14 @@ export async function rateLimit(
   return success;
 }
 
-// NEW: Get current request count in the sliding window
 export async function getRequestCount(
   clientId: string,
   ip: string
 ): Promise<number> {
   const key = `ratelimit:${clientId}:${ip}`;
   const now = Date.now();
-  const oneMinuteAgo = now - 60_000; // 1 minute in ms (match your duration)
+  const oneSecondAgo = now - 1_000;
 
-  // Count the number of requests in the last minute window
-  const count = await redis.zcount(key, oneMinuteAgo, now);
+  const count = await redis.zcount(key, oneSecondAgo, now);
   return count;
 }
