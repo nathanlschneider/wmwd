@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack --experimental-https",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint"
   },
   "dependencies": {
-    "@erroraware/client": "^1.5.8",
+    "@erroraware/client": "^1.5.18",
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.35.1",
     "next": "15.3.4",

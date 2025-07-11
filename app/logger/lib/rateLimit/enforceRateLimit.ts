@@ -1,6 +1,6 @@
 import { rateLimit } from "./rateLimit";
 import { getClientId } from "./getClientId";
-import { securityHeaders, createErrorResponse } from "../shared";
+import { createErrorResponse } from "../shared";
 
 export async function maybeRateLimit(req: Request, ip: string) {
   const clientId = getClientId();

@@ -45,7 +45,6 @@ export function getClientIP(req: NextRequest): string {
   );
 }
 
-
 export function createErrorResponse(
   message: string,
   status: number = 403,
@@ -144,6 +143,6 @@ export function logError(message: string, err: unknown) {
 }
 
 export function authorizeRequest(req: Request, validationId: string): boolean {
-  const authHeader = req.headers.get("Authorization");
+  const authHeader = req.headers.get('Authorization');
   return authHeader === `Bearer ${validationId}`;
 }

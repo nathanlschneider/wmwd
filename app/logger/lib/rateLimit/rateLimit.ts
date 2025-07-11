@@ -34,5 +34,6 @@ export async function getRequestCount(
   const oneSecondAgo = now - 1_000;
 
   const count = await redis.zcount(key, oneSecondAgo, now);
+  console.log(count, 'count');
   return count;
 }

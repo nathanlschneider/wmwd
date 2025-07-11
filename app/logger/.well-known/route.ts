@@ -153,5 +153,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, publicKey });
   }
 
-  return new NextResponse(null, { status: 204 });
+  return new NextResponse(null, { status: 200 });
 }

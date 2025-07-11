@@ -31,16 +31,12 @@ class ClientSettingsService {
   }
 
   public async blockThisIP(ip: string): Promise<void> {
-    const host =
-      process.env.NODE_ENV === 'production'
-        ? 'erroraware.com'
-        : 'localhost:3002';
-    const protocol =
-      process.env.NODE_ENV === 'development' && host.includes('localhost')
-        ? 'http'
-        : 'https';
+        const host =
+          process.env.NODE_ENV === 'production'
+            ? 'erroraware.com'
+            : 'localhost:3002';
 
-    await fetch(`${protocol}://${host}/api/blockedips`, {
+    await fetch(`https://${host}/api/blockedips`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -62,16 +58,12 @@ class ClientSettingsService {
       'utf-8'
     );
     const [clientId] = decoded.split(':');
-    const host =
-      process.env.NODE_ENV === 'production'
-        ? 'erroraware.com'
-        : 'localhost:3002';
-    const protocol =
-      process.env.NODE_ENV === 'development' && host.includes('localhost')
-        ? 'http'
-        : 'https';
+        const host =
+          process.env.NODE_ENV === 'production'
+            ? 'erroraware.com'
+            : 'localhost:3002';
 
-    const res = await fetch(`${protocol}://${host}/api/clientconfigs`, {
+    const res = await fetch(`https://${host}/api/clientconfigs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

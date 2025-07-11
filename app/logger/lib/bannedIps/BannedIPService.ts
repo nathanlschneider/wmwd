@@ -39,15 +39,14 @@ class BannedIPService {
         if (!vId) {
           throw new Error('Invalid ERROR_AWARE_KEY format');
         }
-        const protocol =
-          process.env.NODE_ENV === 'production' ? 'https' : 'http';
+     
         const host =
           process.env.NODE_ENV === 'production'
             ? 'erroraware.com'
             : 'localhost:3002';
 
         const response = await this.fetchWithRetry(
-          `${protocol}://${host}/api/blockedips?vid=${vId}`,
+          `https://${host}/api/blockedips?vid=${vId}`,
           {
             method: 'GET',
             headers: {
@@ -57,8 +56,20 @@ class BannedIPService {
           }
         );
 
+        if (response.status === 404) {
+          const msg = 'Blocked IP list not found (404). Skipping IP bans.';
+          if (process.env.NODE_ENV === 'production') {
+            console.error(msg);
+          } else {
+            console.warn(msg);
+          }
+          this.bannedIPs.clear();
+          this.lastFetch = new Date();
+          return;
+        }
+
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`Failed to fetch banned IPs: ${response.statusText}`);
         }
 
         const data = await response.json();
